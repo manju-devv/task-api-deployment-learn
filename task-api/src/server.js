@@ -1,20 +1,26 @@
 import express from "express";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
+import "dotenv/config";
 // import { tasks } from "../data/dummy.js";
 import { connectDB } from "./config/db.js";
 import Task from "./models/Task.js";
 import mongoose from "mongoose";
 import { connectRedis, redisClient } from "./config/redis.js";
 import cors from "cors";
+import profilePhotoRoutes from "./routes/profilePhoto.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
-dotenv.config();
+// dotenv.config();
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173"
 }));
 app.use(express.json());
+
+app.use("/profile-photo", profilePhotoRoutes);
+app.use("/users", userRoutes);
 
 
 
@@ -177,18 +183,22 @@ app.put("/tasks/:id", async (req, res) => {
 async function startServer() {
     await connectDB();
     await connectRedis();
-    const server = app.listen(PORT, () => {
-        console.log(`Server running on http://localhost:${PORT}`);
+    const server = app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running on port: ${PORT}`);
     });
     return server;
 };
 
 function errorHandler(err, req, res, next) {
     console.error(err.stack);
-    const statusCode = err.statusCode || 500;
+    let statusCode = err.statusCode || err.status || 500;
+    if (err.name === "MulterError") {
+        statusCode = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    }
+
     res.status(statusCode).json({
         message: statusCode === 500
-            ? "Internal Server Error"
+            ? `Internal Server Error: ${err.message}`
             : err.message,
     });
 }

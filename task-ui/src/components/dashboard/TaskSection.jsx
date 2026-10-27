@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
 import { createTaskAPI, editTaskAPI, getTaskByIdAPI, getTasksAPI, deleteTaskAPI } from "../../api/tasks";
+import {
+    Pencil,
+    Trash2,
+    Check,
+    RotateCcw,
+    CircleCheck,
+} from "lucide-react";
+import { toast } from "sonner";
 
 function TaskSection({ tasks, setTasks }) {
     const [loading, setLoading] = useState(false);
@@ -42,22 +50,23 @@ function TaskSection({ tasks, setTasks }) {
             setFormError("");
             if (editMode) {
                 await editTaskAPI(idToUpdate, { title: trimmedTitle, completed: taskCompletedStatus });
+                toast.success("Task updated successfully!");
             } else {
                 await createTaskAPI({
                     title: trimmedTitle,
                 });
+                toast.success("Task created successfully!");
             }
             const refreshed = await fetchTasks();
-
             if (!refreshed) {
                 setFormError("Saved successfully, but failed to refresh the task list.");
                 return;
             }
-
             resetTaskForm();
             setIsModalOpen(false);
         } catch (err) {
             setFormError(err.message || `Failed to ${editMode ? "update" : "create"} task.`);
+            toast.error(err.message || `Failed to ${editMode ? "update" : "create"} task.`);
         } finally {
             setIsSaving(false);
         }
@@ -76,10 +85,12 @@ function TaskSection({ tasks, setTasks }) {
             // setTasks((currentTasks) =>
             //     currentTasks.filter((task) => task._id !== taskToDelete._id)
             // );
+            toast.success("Task deleted successfully!");
             await fetchTasks();
             setTaskToDelete(null);
         } catch (err) {
             setError(err.message || "Failed to delete task.");
+            toast.error(err.message || "Failed to delete task.");
         } finally {
             setIsDeleting(false);
         }
@@ -224,7 +235,7 @@ function TaskSection({ tasks, setTasks }) {
                 ) : filteredTasks.length === 0 ? (
                     <div className="py-10 text-center">
                         <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-2xl text-slate-400">
-                            ✓
+                            <CircleCheck size={28} />
                         </div>
 
                         <h3 className="mt-5 text-base font-semibold text-slate-800">
@@ -248,77 +259,81 @@ function TaskSection({ tasks, setTasks }) {
                         {filteredTasks.map((task) => (
                             <li
                                 key={task._id}
-                                className="flex items-center gap-3 py-4 first:pt-0 last:pb-0"
+                                className="flex md:items-center gap-3 py-4 first:pt-0 last:pb-0"
                             >
                                 <span
                                     aria-hidden="true"
-                                    className={`size-2.5 shrink-0 rounded-full ${task.completed
+                                    className={`size-2.5 shrink-0 rounded-full mt-[0.5rem] md:mt-0 ${task.completed
                                         ? "bg-emerald-500"
                                         : "bg-amber-500"
                                         }`}
                                 />
-                                <div className="min-w-0 flex-1">
-                                    <span
-                                        className={`min-w-0 flex-1 break-words text-sm font-medium ${task.completed
-                                            ? "text-slate-400 line-through"
-                                            : "text-slate-800"
-                                            }`}
-                                    >
-                                        {task.title}
-                                    </span>
-                                    {task.createdAt && (
-                                        <p className="mt-1 text-xs text-slate-400">
-                                            Created at: {" "}
-                                            {new Date(task.createdAt).toLocaleString("en-IN", {
-                                                day: "numeric",
-                                                month: "short",
-                                                year: "numeric",
-                                                hour: "numeric",
-                                                minute: "2-digit",
-                                            })}
-                                        </p>
-                                    )}
-                                </div>
+                                <div className="flex flex-col md:flex-row md:justify-around md:items-center flex-1 gap-[1rem]">
+                                    <div className="min-w-0 flex-1">
+                                        <span
+                                            className={`min-w-0 flex-1 break-words text-sm font-medium ${task.completed
+                                                ? "text-slate-400 line-through"
+                                                : "text-slate-800"
+                                                }`}
+                                        >
+                                            {task.title}
+                                        </span>
+                                        {task.createdAt && (
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                Created at: {" "}
+                                                {new Date(task.createdAt).toLocaleString("en-IN", {
+                                                    day: "numeric",
+                                                    month: "short",
+                                                    year: "numeric",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                })}
+                                            </p>
+                                        )}
+                                    </div>
 
-                                <span
-                                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${task.completed
-                                        ? "bg-emerald-50 text-emerald-700"
-                                        : "bg-amber-50 text-amber-700"
-                                        }`}
-                                >
-                                    {task.completed ? "Completed" : "Active"}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => getTaskById(task._id)}
-                                    aria-label={`Edit task: ${task.title}`}
-                                    title="Edit task"
-                                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-600 cursor-pointer"
-                                >
-                                    ✏️
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => updateStatusOfTask(task)}
-                                    aria-label={
-                                        task.completed
-                                            ? `Mark ${task.title} as active`
-                                            : `Mark ${task.title} as completed`
-                                    }
-                                    title={task.completed ? "Mark as active" : "Mark as completed"}
-                                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
-                                >
-                                    {task.completed ? "↩" : "✓"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleDeleteTask(task)}
-                                    aria-label={`Delete task: ${task.title}`}
-                                    title="Delete task"
-                                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-red-600 cursor-pointer"
-                                >
-                                    🗑️
-                                </button>
+                                    <div className="flex items-center md:gap-[1rem]">
+                                        <span
+                                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${task.completed
+                                                ? "bg-emerald-50 text-emerald-700"
+                                                : "bg-amber-50 text-amber-700"
+                                                }`}
+                                        >
+                                            {task.completed ? "Completed" : "Active"}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => getTaskById(task._id)}
+                                            aria-label={`Edit task: ${task.title}`}
+                                            title="Edit task"
+                                            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 focus-visible:outline-2 focus-visible:outline-indigo-600 cursor-pointer"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateStatusOfTask(task)}
+                                            aria-label={
+                                                task.completed
+                                                    ? `Mark ${task.title} as active`
+                                                    : `Mark ${task.title} as completed`
+                                            }
+                                            title={task.completed ? "Mark as active" : "Mark as completed"}
+                                            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"
+                                        >
+                                            {task.completed ? <RotateCcw size={16} /> : <Check size={16} />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteTask(task)}
+                                            aria-label={`Delete task: ${task.title}`}
+                                            title="Delete task"
+                                            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-2 focus-visible:outline-red-600 cursor-pointer"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -339,7 +354,7 @@ function TaskSection({ tasks, setTasks }) {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="create-task-title"
-                        className="w-full max-w-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-7"
+                        className="w-full md:max-w-1/2 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-7"
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div>
@@ -348,11 +363,11 @@ function TaskSection({ tasks, setTasks }) {
                                 </p>
                                 <h2
                                     id="create-task-title"
-                                    className="mt-2 text-xl font-semibold tracking-tight text-slate-900"
+                                    className="mt-2 text-md md:text-xl font-semibold tracking-tight text-slate-900"
                                 >
                                     Create a new task
                                 </h2>
-                                <p className="mt-2 text-sm leading-6 text-slate-500">
+                                <p className="mt-2 text-xs leading-normal md:text-sm md:leading-6 text-slate-500">
                                     Capture what you need to get done. You can manage its status later.
                                 </p>
                             </div>
@@ -461,7 +476,7 @@ function TaskSection({ tasks, setTasks }) {
                     >
                         <div className="flex items-start gap-4">
                             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-red-50 text-xl text-red-600">
-                                🗑️
+                                <Trash2 size={16} />
                             </div>
 
                             <div className="min-w-0">
@@ -490,7 +505,7 @@ function TaskSection({ tasks, setTasks }) {
                                 type="button"
                                 disabled={isDeleting}
                                 onClick={() => setTaskToDelete(null)}
-                                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -499,7 +514,7 @@ function TaskSection({ tasks, setTasks }) {
                                 type="button"
                                 disabled={isDeleting}
                                 onClick={confirmDeleteTask}
-                                className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                             >
                                 {isDeleting ? "Deleting..." : "Delete task"}
                             </button>
