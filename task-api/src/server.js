@@ -9,6 +9,8 @@ import { connectRedis, redisClient } from "./config/redis.js";
 import cors from "cors";
 import profilePhotoRoutes from "./routes/profilePhoto.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import { authenticateUser } from "./middleware/auth.middleware.js";
 
 // dotenv.config();
 const app = express();
@@ -19,10 +21,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.use("/profile-photo", profilePhotoRoutes);
-app.use("/users", userRoutes);
-
-
+app.use("/profile-photo",authenticateUser, profilePhotoRoutes);
+app.use("/users",authenticateUser, userRoutes);
+app.use("/auth", authRoutes);
 
 const CACHE_TTL = Number(process.env.REDIS_CACHE_TTL ?? 60);
 
@@ -36,100 +37,106 @@ app.get("/", (req, res) => {
     })
 });
 
-app.get("/tasks", async (req, res) => {
-    const cacheKey = "tasks:all";
+app.get("/auth/me", authenticateUser, (req, res) => {
+    res.status(200).json({
+        message: "Authenticated successfully!",
+        user: req.user,
+    });
+});
+
+
+app.get("/tasks", authenticateUser, async (req, res) => {
+    const userId = req.user._id.toString();
+    const cacheKey = `tasks:${userId}:all`;
     const cachedTasks = await redisClient.get(cacheKey);
     if (cachedTasks !== null) {
         console.log("Cache HIT!");
         return res.status(200).json({
-            tasks: JSON.parse(cachedTasks)
+            tasks: JSON.parse(cachedTasks),
         });
-    };
-    console.log("Cache Miss");
-    const tasks = await Task.find().lean();
-    await redisClient.set(cacheKey, JSON.stringify(tasks), { EX: CACHE_TTL })
-    res.status(200).json({ tasks })
+    }
+    console.log("Cache MISS");
+    const tasks = await Task.find({
+        userId: req.user._id,
+    }).lean();
+    await redisClient.set(
+        cacheKey,
+        JSON.stringify(tasks),
+        { EX: CACHE_TTL }
+    );
+    return res.status(200).json({ tasks });
 });
 
-app.post("/tasks", async (req, res) => {
+
+
+app.post("/tasks", authenticateUser, async (req, res) => {
     const { title } = req.body;
     if (typeof title !== "string" || !title.trim()) {
         return res.status(400).json({
             message: "Title must be a non-empty string!",
         });
     }
-    // tasks.push({ id: tasks.length + 1, title, completed: false });
-    const task = await Task.create({ title })
-    await redisClient.del("tasks:all");
-    res.status(201).json({
-        message: "item added successfully!",
+    const task = await Task.create({
+        title: title.trim(),
+        userId: req.user._id,
+    });
+    const cacheKey = `tasks:${req.user._id}:all`;
+    await redisClient.del(cacheKey);
+    return res.status(201).json({
+        message: "Item added successfully!",
         data: task,
     });
-
 });
 
-app.get("/tasks/:id", async (req, res) => {
+
+
+app.get("/tasks/:id", authenticateUser, async (req, res) => {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) {
         return res.status(400).json({
             message: "Invalid task ID!",
         });
     }
-    const task = await Task.findById(id);
-    if (!task) {
-        return res.status(404).json({
-            message: "Task not found!"
-        });
-    };
-    return res.status(200).json({ task });
-    // const id = req.params.id;
-    // const item = tasks.find((it) => it.id === Number(id));
-    // if (!item) {
-    //     return res.status(404).json({
-    //         message: `invalid id provided! ${id}`
-    //     });
-    // };
-    // return res.status(200).json({
-    //     item
-    // });
-});
-
-app.delete("/tasks/:id", async (req, res) => {
-
-    const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) {
-        return res.status(400).json({
-            message: "Invalid task ID!",
-        });
-    }
-    const task = await Task.findByIdAndDelete(id);
+    const task = await Task.findOne({
+        _id: id,
+        userId: req.user._id,
+    }).lean();
     if (!task) {
         return res.status(404).json({
             message: "Task not found!",
         });
-    };
-    await redisClient.del("tasks:all");
+    }
+    return res.status(200).json({ task });
+});
+
+
+app.delete("/tasks/:id", authenticateUser, async (req, res) => {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(400).json({
+            message: "Invalid task ID!",
+        });
+    }
+    const task = await Task.findOneAndDelete({
+        _id: id,
+        userId: req.user._id,
+    });
+    if (!task) {
+        return res.status(404).json({
+            message: "Task not found!",
+        });
+    }
+    const cacheKey = `tasks:${req.user._id}:all`;
+    await redisClient.del(cacheKey);
     return res.status(200).json({
         message: "Task deleted successfully!",
         task,
     });
-    // const id = req.params.id;
-    // const idToRemove = tasks.findIndex(item => item.id === Number(id));
-    // const task = tasks.find((item) => item.id === Number(id));
-    // if (idToRemove !== -1) {
-    //     tasks.splice(idToRemove, 1);
-    //     return res.status(200).json({
-    //         message: "item deleted successfully",
-    //         task
-    //     });
-    // };
-    // return res.status(404).json({
-    //     message: `Invalid id provided: ${id}`
-    // })
 });
 
-app.put("/tasks/:id", async (req, res) => {
 
+
+app.put("/tasks/:id", authenticateUser, async (req, res) => {
     const { id } = req.params;
     const { title, completed } = req.body;
     if (!mongoose.isValidObjectId(id)) {
@@ -137,48 +144,42 @@ app.put("/tasks/:id", async (req, res) => {
             message: "Invalid task ID!",
         });
     }
-    if (typeof title !== "string" || !title.trim() ||
-        typeof completed !== "boolean") {
+    if (
+        typeof title !== "string" ||
+        !title.trim() ||
+        typeof completed !== "boolean"
+    ) {
         return res.status(400).json({
             message: "A valid title and completed boolean are required!",
         });
     }
-    const task = await Task.findByIdAndUpdate(id,
-        { title: title.trim(), completed },
-        { returnDocument: "after", runValidators: true }
+    const task = await Task.findOneAndUpdate(
+        {
+            _id: id,
+            userId: req.user._id,
+        },
+        {
+            title: title.trim(),
+            completed,
+        },
+        {
+            returnDocument: "after",
+            runValidators: true,
+        }
     );
     if (!task) {
         return res.status(404).json({
             message: "Task not found!",
         });
     }
-    await redisClient.del("tasks:all");
+    const cacheKey = `tasks:${req.user._id}:all`;
+    await redisClient.del(cacheKey);
     return res.status(200).json({
         message: "Task updated successfully!",
         task,
     });
-
-    // const id = req.params.id;
-    // const { title, completed } = req.body;
-    // if (!title?.trim() || completed === undefined) {
-    //     return res.status(400).json({
-    //         message: "title and completed fields cant be empty!",
-    //     });
-    // };
-    // const taskToUpdate = tasks.find(item => item.id === Number(id));
-    // if (!taskToUpdate) {
-    //     return res.status(404).json({
-    //         message: "Task not found!",
-    //         error: `Invalid id provided: ${id}`,
-    //     });
-    // }
-    // taskToUpdate.title = title;
-    // taskToUpdate.completed = completed;
-    // return res.status(200).json({
-    //     message: "Task updated successfully!",
-    //     task: taskToUpdate
-    // });
 });
+
 
 async function startServer() {
     await connectDB();

@@ -23,4 +23,24 @@ export const routes = {
         url: "/tasks",
         method: "DELETE",
     },
+
+    signUp: {
+        url: "/auth/signup",
+        method: "POST",
+    },
+
+    login: {
+        url: "/auth/login",
+        method: "POST",
+    },
+
+    googleAuth: {
+        url: "/auth/google",
+        method: "POST",
+    },
+
+    about: {
+        url: "/users/me",
+        method: "GET",
+    },
 };

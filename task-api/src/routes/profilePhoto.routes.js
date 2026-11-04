@@ -2,8 +2,6 @@ import { Router } from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { getProfilePhotoUrl, uploadProfilePhoto, deleteProfilePhoto } from "../services/s3.service.js";
-import User from "../models/User.js";
-import mongoose from "mongoose";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
@@ -26,23 +24,23 @@ const allowedTypes = new Set([
 
 router.post("/", upload.single("photo"), async (req, res, next) => {
     try {
-        const { userId } = req.body;
-        if (!userId) {
-            return res.status(400).json({
-                message: "User ID is required.",
-            });
-        }
-        if (!mongoose.isValidObjectId(userId)) {
-            return res.status(400).json({
-                message: "Invalid user ID.",
-            });
-        }
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({
-                message: "User not found.",
-            });
-        }
+        const user = req.user;
+        // if (!userId) {
+        //     return res.status(400).json({
+        //         message: "User ID is required.",
+        //     });
+        // }
+        // if (!mongoose.isValidObjectId(userId)) {
+        //     return res.status(400).json({
+        //         message: "Invalid user ID.",
+        //     });
+        // }
+        // const user = await User.findById(userId);
+        // if (!user) {
+        //     return res.status(404).json({
+        //         message: "User not found.",
+        //     });
+        // }
         if (!req.file) {
             return res.status(400).json({
                 message: "Please upload a photo.",

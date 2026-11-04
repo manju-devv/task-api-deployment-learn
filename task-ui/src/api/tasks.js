@@ -10,7 +10,6 @@ export async function getTasksAPI() {
 }
 
 
-
 export async function createTaskAPI(body) {
     const route = routes.createTask;
     return await apiRequest(route.url, {
