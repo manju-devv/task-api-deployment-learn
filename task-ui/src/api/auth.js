@@ -10,7 +10,7 @@ export function signupUser(body) {
 }
 
 
-export function googleAuth(idToken) {
+export function googleAuth(idToken, turnstileToken) {
     const route = routes.googleAuth;
     return apiRequest(route.url, {
         method: route.method,

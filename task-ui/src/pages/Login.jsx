@@ -27,8 +27,9 @@ function Login() {
     const widgetIdRef = useRef(null);
 
     const [turnstileToken, setTurnstileToken] = useState("");
+    const turnstileTokenRef = useRef("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const googleButtonRef = useGoogleAuth(() => turnstileToken);
+    const googleButtonRef = useGoogleAuth(() => turnstileTokenRef.current);
 
 
     const validateForm = () => {
@@ -86,6 +87,7 @@ function Login() {
             console.error(error);
             toast.error(error.message);
             setTurnstileToken("");
+            turnstileTokenRef.current = "";
             if (widgetIdRef.current !== null && window.turnstile) {
                 window.turnstile.reset(widgetIdRef.current);
             }
@@ -106,12 +108,15 @@ function Login() {
                 appearance: "always",
                 execution: "render",
                 callback: (token) => {
+                    turnstileTokenRef.current = token;
                     setTurnstileToken(token);
                 },
                 "expired-callback": () => {
+                    turnstileTokenRef.current = "";
                     setTurnstileToken("");
                 },
                 "error-callback": () => {
+                    turnstileTokenRef.current = "";
                     setTurnstileToken("");
                     toast.error("CAPTCHA verification failed. Please try again.");
                 },

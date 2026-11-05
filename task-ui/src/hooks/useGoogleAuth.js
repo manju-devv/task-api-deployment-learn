@@ -30,8 +30,12 @@ export function useGoogleAuth(getTurnstileToken) {
                         toast.success("Google authentication successful!");
                         navigate("/dashboard");
                     } catch (err) {
-                        console.error(err.message);
-                        toast.error(err.message);
+                        console.error("[Google Auth Error]", err);
+                        toast.error(
+                            err.response?.data?.message ||
+                            err.message ||
+                            "Google authentication failed"
+                        );
                     }
                 },
             });
